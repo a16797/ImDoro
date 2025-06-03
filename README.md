@@ -3,7 +3,7 @@
 
 # ImDoro
 
-DORO小助手。
+Doro小助手。
 
 </div>
 
