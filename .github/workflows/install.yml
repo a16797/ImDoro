@@ -1,0 +1,65 @@
+name: package
+
+# 触发工作流的条件
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"  # 匹配v数字.数字.数字及其后缀，如v1.2.3
+    paths:    
+      - ".github/workflows/install.yml"
+      - "img/**"
+      - "ImDoro.ml"
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: set_tag
+        run: |
+          # 从tag获取版本号
+          if [[ ${{ github.ref }} =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tag=${GITHUB_REF#refs/tags/}
+          else
+            tag="v0.0.1"
+          fi
+          echo tag=$tag | tee -a $GITHUB_OUTPUT
+    outputs:
+      tag: ${{ steps.set_tag.outputs.tag }}
+
+  package:
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create package
+        run: |
+          mkdir -p package
+          cp -r img package/
+          cp ImDoro.ml package/
+          cd package
+          zip -r "../ImDoro-${{ needs.meta.outputs.tag }}.zip" .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ImDoro-${{ needs.meta.outputs.tag }}
+          path: "ImDoro-${{ needs.meta.outputs.tag }}.zip"
+
+  release:
+    needs: [meta, package]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ImDoro-${{ needs.meta.outputs.tag }}
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ImDoro-${{ needs.meta.outputs.tag }}.zip
+          tag_name: ${{ needs.meta.outputs.tag }}
+          draft: false
+          prerelease: false
